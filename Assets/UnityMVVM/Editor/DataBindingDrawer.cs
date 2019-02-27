@@ -460,7 +460,6 @@ namespace UnityMVVM
                 _prop.serializedObject.ApplyModifiedProperties();
             }
 
-
             public void Clear()
             {
                 _prop.FindPropertyRelative(methodNamePath).stringValue = null;

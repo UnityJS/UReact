@@ -10,11 +10,7 @@ namespace UnityMVVM
 {
     public class View : MonoBehaviour
     {
-        [SerializeField]
-        public DataBinding dataBinding = new DataBinding();
-
-        //[SerializeField]
-        //public UnityjsDataBinding forIn = new UnityjsDataBinding();
+        [SerializeField] public DataBinding dataBinding = new DataBinding();
 
         private ViewModel _viewModel;
         public ViewModel viewModel
@@ -40,11 +36,9 @@ namespace UnityMVVM
 
         public void DetachViewModel()
         {
-            if (this._viewModel)
-            {
-                this._viewModel.DetachView(this);
-                this._viewModel = null;
-            }
+            if (this._viewModel == null) return;
+            this._viewModel.DetachView(this);
+            this._viewModel = null;
         }
 
         void Awake()

@@ -35,9 +35,17 @@ namespace UnityMVVM
     [Serializable]
     public class PersistentCall
     {
-        public PersistentCall()
-        {
-        }
+        [SerializeField] private Object target;
+        [SerializeField] private string methodName;
+        [SerializeField] private PersistentListenerMode mode = PersistentListenerMode.Void;
+        [SerializeField] private string argument;
+        private BaseInvokableCall _runtimeCall = null;
+        private bool _dirty = true;
+        private BaseExpression _expression = null;
+        private ParserArgument _parser = new ParserArgument();
+        public View view = null;
+
+        public PersistentCall() { }
         public PersistentCall(Object target, string methodName, PersistentListenerMode mode, string argument)
         {
             this.target = target;
@@ -45,34 +53,19 @@ namespace UnityMVVM
             this.mode = mode;
             this.argument = argument;
         }
-        [SerializeField] private Object target;
-
-        [SerializeField] private string methodName;
-
-        [SerializeField] private PersistentListenerMode mode = PersistentListenerMode.Void;
-
-        [SerializeField] private string argument;
-
-        BaseInvokableCall runtimeCall = null;
-
-        public View view = null;
-        private bool _dirty = true;
-
-        private BaseExpression expression = null;
-        private ParserArgument _parser = new ParserArgument();
 
         public void Init(View view)
         {
             this.view = view;
-            if (expression == null)
-                expression = _parser.Parser(argument);
+            if (_expression == null)
+                _expression = _parser.Parser(argument);
         }
 
         public bool AttachView(ViewData viewData, View view)
         {
             this.view = view;
-            if (expression == null)
-                expression = _parser.Parser(argument);
+            if (_expression == null)
+                _expression = _parser.Parser(argument);
             if (!_parser.dataExpressions.ContainsKey(viewData.name)) return false;
             _parser.dataExpressions[viewData.name].data = viewData;
             return true;
@@ -88,8 +81,8 @@ namespace UnityMVVM
         {
             if (!_dirty) return;
             _dirty = false;
-            if (expression != null)
-                Invoke(expression.GetValue());
+            if (_expression != null)
+                Invoke(_expression.GetValue());
         }
 
         internal static MethodInfo FindMethod(object target, string methodName, PersistentListenerMode mode)
@@ -145,12 +138,12 @@ namespace UnityMVVM
 
         public void Invoke(object value)
         {
-            if (runtimeCall == null)
+            if (_runtimeCall == null)
             {
-                runtimeCall = GetRuntimeCall();
+                _runtimeCall = GetRuntimeCall();
             }
 
-            if (runtimeCall != null)
+            if (_runtimeCall != null)
             {
                 switch (mode)
                 {
@@ -186,7 +179,7 @@ namespace UnityMVVM
                             value = Convert.ToBoolean(value);
                         break;
                 }
-                runtimeCall.Invoke(value);
+                _runtimeCall.Invoke(value);
             }
         }
     }
