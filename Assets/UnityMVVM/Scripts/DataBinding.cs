@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using Object = UnityEngine.Object;
 
-namespace UnityjsMVVM
+namespace UnityMVVM
 {
     internal abstract class BaseInvokableCall
     {

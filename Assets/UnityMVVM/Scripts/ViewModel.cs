@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.Events;
 
-namespace UnityjsMVVM
+namespace UnityMVVM
 {
     public class ViewData
     {
@@ -147,7 +147,6 @@ namespace UnityjsMVVM
         {
             foreach (var it in _data)
             {
-                //Debug.Log("Update " + it.Value.name);
                 it.Value.Update();
             }
         }
@@ -176,6 +175,25 @@ namespace UnityjsMVVM
                 viewData.DetachView(view);
             }
         }
+        
+        public void DetachViewModel()
+        {
+            for (var i = views.Count - 1; i >= 0; --i)
+            {
+                views[i].DetachViewModel();
+            }
+            if (views.Count > 0)
+                Debug.LogError("Views are not all cleared! "+views.Count+" left");
+        }
+
+        public void ClearViews()
+        {
+            views.Clear();
+            foreach (var it in _data)
+            {
+                it.Value.Clear();
+            }
+        }
 
         void FindAndAttachViews(Transform t)
         {
@@ -192,7 +210,7 @@ namespace UnityjsMVVM
                     var argument = text.text;
                     if (argument.IndexOf("{{") != -1)
                     {
-                        argument = ("\"" + argument.Replace("{{", "\"+").Replace("}}", "+\"") + "\"").Replace("\"\"+", "").Replace("+\"\"", "");
+                        argument = ("\"" + argument.Replace("{{", "\"+(").Replace("}}", ")+\"") + "\"").Replace("\"\"+", "").Replace("+\"\"", "");
                         //Debug.Log(argument);
                         view = t.gameObject.AddComponent<View>();
                         view.AddDataBinding(text, "set_text", PersistentListenerMode.String, argument);
@@ -209,23 +227,19 @@ namespace UnityjsMVVM
                     FindAndAttachViews(child);
             }
         }
+        void Awake()
+        {
+            FindAndAttachViews(this.transform);
+        }
+
+        void OnDestroy()
+        {
+            DetachViewModel();
+        }
 
         void OnBeforeTransformParentChanged()
         {
-            for (var i = 0; i < views.Count; ++i)
-            {
-                views[i].DetachViewModel();
-            }
-            views.Clear();
-        }
-
-        public void ClearViews()
-        {
-            views.Clear();
-            foreach (var it in _data)
-            {
-                it.Value.Clear();
-            }
+            DetachViewModel();
         }
 
         void OnTransformParentChanged()

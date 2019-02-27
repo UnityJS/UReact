@@ -1,4 +1,4 @@
-# UnityjsMVVM
+# UnityMVVM
 
 A swift MVVM framework for Unity3D.
 
@@ -8,17 +8,17 @@ A swift MVVM framework for Unity3D.
 
 - Modify the `UI.Text` component properties `text` to `"My Level is {{level+1}}"`
 
-- Or and the `UnityjsMVVM.View` component
+- Or and the `UnityMVVM.View` component
   - Bind the data you need under the current GameObject
   - Input value `'"My Level is "+(level+1)'`
 
 **step 2**
 * Coding in the script
   ```C#
-  UnityjsMVVM.ViewModel.global.Set("level", 11);
+  UnityMVVM.ViewModel.global.Set("level", 11);
   ```
 
-* Or and the `UnityjsMVVM.ViewModel` component to control children's `UnityjsMVVM.View`
+* Or and the `UnityMVVM.ViewModel` component to control children's `UnityMVVM.View`
   ```C#
   myViewModel.Set("level", 11);
   ```

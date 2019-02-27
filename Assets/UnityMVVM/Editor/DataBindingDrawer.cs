@@ -10,7 +10,7 @@ using Object = UnityEngine.Object;
 using EditorGUI = UnityEditor.EditorGUI;
 using UnityEditorInternal;
 
-namespace UnityjsMVVM
+namespace UnityMVVM
 {
     [CustomPropertyDrawer(typeof(DataBinding), true)]
     public class DataBindingDrawer : PropertyDrawer
@@ -115,6 +115,27 @@ namespace UnityjsMVVM
             return (PersistentListenerMode)mode.enumValueIndex;
         }
 
+        static MethodInfo FindMethod(object target, string methodName, PersistentListenerMode mode)
+        {
+            switch (mode)
+            {
+                case PersistentListenerMode.Void:
+                    return UnityEventBase.GetValidMethodInfo(target, methodName, new Type[0]);
+                case PersistentListenerMode.Float:
+                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(float) });
+                case PersistentListenerMode.Int:
+                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(int) });
+                case PersistentListenerMode.Bool:
+                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(bool) });
+                case PersistentListenerMode.String:
+                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(string) });
+                //case PersistentListenerMode.Object:
+                //    return  UnityEventBase.GetValidMethodInfo(target, methodName, new[] { argumentType ?? typeof(Object) });
+                default:
+                    return null;
+            }
+        }
+
         void DrawCall(Rect rect, int index, bool isactive, bool isfocused)
         {
             var propCall = _callsProp.GetArrayElementAtIndex(index);
@@ -152,7 +173,7 @@ namespace UnityjsMVVM
                     }
                     else
                     {
-                        if (PersistentCall.FindMethod(targetObject, propMethodName.stringValue, modeEnum) == null)
+                        if (FindMethod(targetObject, propMethodName.stringValue, modeEnum) == null)
                             buttonLabel.Append("<Missing>");
                         buttonLabel.Append(targetObject.GetType().Name);
                         if (!string.IsNullOrEmpty(propMethodName.stringValue))
