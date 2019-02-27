@@ -6,7 +6,7 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using Object = UnityEngine.Object;
 
-namespace UnityJSMVVM
+namespace UnityjsMVVM
 {
     public class View : MonoBehaviour
     {

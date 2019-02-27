@@ -10,7 +10,7 @@ using Object = UnityEngine.Object;
 using EditorGUI = UnityEditor.EditorGUI;
 using UnityEditorInternal;
 
-namespace UnityJSMVVM
+namespace UnityjsMVVM
 {
     [CustomPropertyDrawer(typeof(DataBinding), true)]
     public class DataBindingDrawer : PropertyDrawer

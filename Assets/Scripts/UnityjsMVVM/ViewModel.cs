@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.Events;
 
-namespace UnityJSMVVM
+namespace UnityjsMVVM
 {
     public class ViewData
     {

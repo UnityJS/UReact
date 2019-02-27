@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace UnityJSMVVM
+namespace UnityjsMVVM
 {
     enum Operator
     {
