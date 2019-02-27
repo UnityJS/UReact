@@ -10,6 +10,24 @@ namespace UnityMVVM
     public class ViewModel : MonoBehaviour
     {
         private static ViewModel _global = null;
+
+        public static ViewModel global
+        {
+            get
+            {
+                if (_global == null)
+                {
+                    SceneManager.sceneLoaded += OnSceneLoaded;
+                    SceneManager.sceneUnloaded += OnSceneUnloaded;
+                    var GlobalViewModel = new GameObject("GlobalViewModel");
+                    DontDestroyOnLoad(GlobalViewModel);
+                    _global = GlobalViewModel.AddComponent<ViewModel>();
+                    AttachViewsInAllScenes();
+                }
+                return _global;
+            }
+        }
+
         private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             AttachViewsInScene(scene);
@@ -40,21 +58,9 @@ namespace UnityMVVM
             }
         }
 
-        public static ViewModel global
+        public static void SetGlobal(string name, object value)
         {
-            get
-            {
-                if (_global == null)
-                {
-                    SceneManager.sceneLoaded += OnSceneLoaded;
-                    SceneManager.sceneUnloaded += OnSceneUnloaded;
-                    var GlobalViewModel = new GameObject("GlobalViewModel");
-                    DontDestroyOnLoad(GlobalViewModel);
-                    _global = GlobalViewModel.AddComponent<ViewModel>();
-                    AttachViewsInAllScenes();
-                }
-                return _global;
-            }
+            global.Set(name, value);
         }
 
         public List<View> views = new List<View>();
@@ -110,7 +116,7 @@ namespace UnityMVVM
                 viewData.DetachView(view);
             }
         }
-        
+
         public void DetachViewModel()
         {
             for (var i = views.Count - 1; i >= 0; --i)
@@ -118,7 +124,7 @@ namespace UnityMVVM
                 views[i].DetachViewModel();
             }
             if (views.Count > 0)
-                Debug.LogError("Views are not all cleared! "+views.Count+" left");
+                Debug.LogError("Views are not all cleared! " + views.Count + " left");
         }
 
         public void ClearViews()

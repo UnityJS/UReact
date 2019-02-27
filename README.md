@@ -15,10 +15,15 @@ A swift MVVM framework for Unity3D.
 **step 2**
 * Coding in the script
   ```C#
-  UnityMVVM.ViewModel.global.Set("level", 11);
+  using UnityMVVM;
+  ViewModel.SetGlobal("level", 11);
   ```
 
 * Or and the `UnityMVVM.ViewModel` component to control children's `UnityMVVM.View`
   ```C#
   myViewModel.Set("level", 11);
   ```
+  
+## Contact
+  Email: 351119125@qq.com
+  WeChat: panhuihui1986
