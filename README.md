@@ -25,5 +25,5 @@ A swift MVVM framework for Unity3D.
   ```
   
 ## Contact
-  Email: 351119125@qq.com
-  WeChat: panhuihui1986
+    Email: 351119125@qq.com
+    WeChat: panhuihui1986
