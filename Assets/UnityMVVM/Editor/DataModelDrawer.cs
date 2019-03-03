@@ -12,8 +12,8 @@ using UnityEditorInternal;
 
 namespace UnityMVVM
 {
-    [CustomPropertyDrawer(typeof(DataBinding), true)]
-    public class DataBindingDrawer : PropertyDrawer
+    [CustomPropertyDrawer(typeof(DataModel), true)]
+    public class DataModelDrawer : PropertyDrawer
     {
         internal const float lineHeight = 16f;
         internal const int verticalSpacing = 2;
@@ -54,7 +54,7 @@ namespace UnityMVVM
                 state._reorderableList.onReorderCallback = EndDragChild;
                 state._reorderableList.onAddCallback = AddCall;
                 state._reorderableList.onRemoveCallback = RemoveButton;
-                state._reorderableList.elementHeight = lineHeight * 2 + verticalSpacing * 3;
+                state._reorderableList.elementHeight = lineHeight * 1 + verticalSpacing * 2;
                 _states[key] = state;
             }
             return state;
@@ -150,27 +150,6 @@ namespace UnityMVVM
             return args.ToString();
         }
 
-        /*static MethodInfo FindMethod(object target, string methodName, PersistentListenerMode mode)
-        {
-            switch (mode)
-            {
-                case PersistentListenerMode.Void:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new Type[0]);
-                case PersistentListenerMode.Float:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(float) });
-                case PersistentListenerMode.Int:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(int) });
-                case PersistentListenerMode.Bool:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(bool) });
-                case PersistentListenerMode.String:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(string) });
-                //case PersistentListenerMode.Object:
-                //    return  UnityEventBase.GetValidMethodInfo(target, methodName, new[] { argumentType ?? typeof(Object) });
-                default:
-                    return null;
-            }
-        }*/
-
         void DrawCall(Rect rect, int index, bool isactive, bool isfocused)
         {
             var propCall = _callsProp.GetArrayElementAtIndex(index);
@@ -179,9 +158,9 @@ namespace UnityMVVM
             rect.y += verticalSpacing;
 
             Rect functionRect = rect;
+            functionRect.width *= 0.6f;
             Rect argRect = rect;
-            argRect.xMin += 5;
-            argRect.y += lineHeight + verticalSpacing;
+            argRect.xMin = functionRect.xMax + 5;
 
             var propTarget = propCall.FindPropertyRelative(targetPath);
             var propMethodName = propCall.FindPropertyRelative(methodNamePath);
@@ -192,9 +171,13 @@ namespace UnityMVVM
             Color c = GUI.backgroundColor;
             GUI.backgroundColor = Color.white;
 
-            if (targetObject != null && !string.IsNullOrEmpty(propMethodName.stringValue))
+            if (targetObject != null)
             {
                 EditorGUI.PropertyField(argRect, propArgument, GUIContent.none);
+                if (string.IsNullOrEmpty(propArgument.stringValue))
+                {
+                    GUI.Label(argRect, "Data Name", EditorStyles.centeredGreyMiniLabel);
+                }
             }
 
             using (new EditorGUI.DisabledScope(targetObject == null))
@@ -202,9 +185,13 @@ namespace UnityMVVM
                 EditorGUI.BeginProperty(functionRect, GUIContent.none, propMethodName);
                 {
                     var buttonLabel = new StringBuilder();
-                    if (targetObject == null || string.IsNullOrEmpty(propMethodName.stringValue))
+                    if (targetObject == null)
                     {
                         buttonLabel.Append(strNoBinding);
+                    }
+                    else if (string.IsNullOrEmpty(propMethodName.stringValue))
+                    {
+                        buttonLabel.Append(targetObject.GetType().Name);
                     }
                     else
                     {
@@ -221,14 +208,8 @@ namespace UnityMVVM
                         var methodInfo = UnityEventBase.GetValidMethodInfo(targetObject, propMethodName.stringValue, types);
                         if (methodInfo == null)
                             buttonLabel.Append("<Missing>");
-                        else if (string.IsNullOrEmpty(propArgument.stringValue))
-                        {
-                            GUI.Label(argRect, GetMethodParameters(methodInfo), EditorStyles.centeredGreyMiniLabel);
-                        }
                         if (propMethodName.stringValue.StartsWith("set_"))
                             buttonLabel.Append(string.Format("{0}.{1} : {2}", targetObject.GetType().Name, propMethodName.stringValue.Substring(4), args.ToString()));
-                        else
-                            buttonLabel.Append(string.Format("{0}.{1} ({2})", targetObject.GetType().Name, propMethodName.stringValue, args.ToString()));
                     }
 
                     if (GUI.Button(functionRect, buttonLabel.ToString(), EditorStyles.popup))
@@ -337,16 +318,15 @@ namespace UnityMVVM
                 return;
 
             Type componentType = target.GetType();
-            var componentMethods = componentType.GetMethods().Where(x => !x.IsSpecialName).ToList();
 
             var wantedProperties = componentType.GetProperties().AsEnumerable();
             wantedProperties = wantedProperties.Where(x => x.GetCustomAttributes(typeof(ObsoleteAttribute), true).Length == 0 && x.GetSetMethod() != null);
-            componentMethods.AddRange(wantedProperties.Select(x => x.GetSetMethod()));
+            var componentMethods = wantedProperties.Select(x => x.GetSetMethod());
 
             foreach (var componentMethod in componentMethods)
             {
                 var componentParamaters = componentMethod.GetParameters();
-                if (componentParamaters.Length < 1)
+                if (componentParamaters.Length != 1)
                     continue;
 
                 if (componentMethod.GetCustomAttributes(typeof(ObsoleteAttribute), true).Length > 0)
@@ -386,6 +366,11 @@ namespace UnityMVVM
                     methods.Add(vmm);
                 }
             }
+
+            menu.AddItem(new GUIContent(targetName + "/Self"),
+                 false,
+                 SetTargetFunction,
+                 new object[] { propCall, target });
 
             if (methods.Count > 0)
             {
@@ -456,11 +441,9 @@ namespace UnityMVVM
             else
             {
                 if (methodName.StartsWith("set_"))
-                    return string.Format("{0}/Fields/{1} : {2}", targetName, methodName.Substring(4), args);
-                else if (multiple)
-                    return string.Format("{0}/Methods/{1}.../{1} ({2})", targetName, methodName, args);
+                    return string.Format("{0}/{1} : {2}", targetName, methodName.Substring(4), args);
                 else
-                    return string.Format("{0}/Methods/{1} ({2})", targetName, methodName, args);
+                    return string.Format("{0}/{1} : {2}", targetName, methodName, args);
             }
         }
 
@@ -468,6 +451,16 @@ namespace UnityMVVM
         {
             ((UnityEventFunction)source).Assign();
         }
+        static void SetTargetFunction(object source)
+        {
+            SerializedProperty propCall = ((object[])source)[0] as SerializedProperty;
+            Object target = ((object[])source)[1] as Object;
+            propCall.FindPropertyRelative(targetPath).objectReferenceValue = target;
+            propCall.FindPropertyRelative(methodNamePath).stringValue = null;
+            propCall.FindPropertyRelative(modesPath).arraySize = 0;
+            propCall.serializedObject.ApplyModifiedProperties();
+        }
+
 
         static void ClearEventFunction(object source)
         {

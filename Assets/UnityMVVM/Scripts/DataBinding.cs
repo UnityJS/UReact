@@ -31,67 +31,21 @@ namespace UnityMVVM
         }
     }
 
-
     [Serializable]
-    public class PersistentCall
+    class PersistentCall
     {
-        [SerializeField] private Object target;
-        [SerializeField] private string methodName;
-        [SerializeField] private PersistentListenerMode mode = PersistentListenerMode.Void;
-        [SerializeField] private string argument;
-        private BaseInvokableCall _runtimeCall = null;
-        private bool _dirty = true;
-        private BaseExpression _expression = null;
-        private ParserArgument _parser = new ParserArgument();
-        public View view = null;
+        [SerializeField] public Object target;
+        [SerializeField] public string methodName;
+        [SerializeField] public PersistentListenerMode[] modes;
+        [SerializeField] public string argument;
 
-        public PersistentCall() { }
-        public PersistentCall(Object target, string methodName, PersistentListenerMode mode, string argument)
-        {
-            this.target = target;
-            this.methodName = methodName;
-            this.mode = mode;
-            this.argument = argument;
-        }
-
-        public void Init(View view)
-        {
-            this.view = view;
-            if (_expression == null)
-                _expression = _parser.Parser(argument);
-        }
-
-        public bool AttachView(ViewData viewData, View view)
-        {
-            this.view = view;
-            if (_expression == null)
-                _expression = _parser.Parser(argument);
-            if (!_parser.dataExpressions.ContainsKey(viewData.name)) return false;
-            _parser.dataExpressions[viewData.name].data = viewData;
-            return true;
-        }
-
-        public void SetDirty()
-        {
-            //if (_dirty) return;
-            _dirty = true;
-        }
-
-        public void Update()
-        {
-            if (!_dirty) return;
-            _dirty = false;
-            if (_expression != null)
-                Invoke(_expression.GetValue());
-        }
-
-        internal static MethodInfo FindMethod(object target, string methodName, PersistentListenerMode mode)
+        internal static MethodInfo FindMethod(object target, string methodName, PersistentListenerMode[] modes)
         {
             //var type = typeof(Object);
             //if (!string.IsNullOrEmpty(call.arguments.unityObjectArgumentAssemblyTypeName))
             //    type = Type.GetType(call.arguments.unityObjectArgumentAssemblyTypeName, false) ?? typeof(Object);
 
-            switch (mode)
+            switch (modes[0])
             {
                 case PersistentListenerMode.Void:
                     return UnityEventBase.GetValidMethodInfo(target, methodName, new Type[0]);
@@ -111,12 +65,12 @@ namespace UnityMVVM
             //call += (UnityAction<float>)theFunction.CreateDelegate(typeof(UnityAction<float>), target);
         }
 
-        internal BaseInvokableCall GetRuntimeCall()
+        internal static BaseInvokableCall GetRuntimeCall(object target, MethodInfo method, PersistentListenerMode[] modes)
         {
-            var method = FindMethod(target, methodName, mode);
-            if (method == null)
-                return null;
-            switch (mode)
+            //var method = FindMethod(target, methodName, modes[0]);
+            //if (method == null)
+            //    return null;
+            switch (modes[0])
             {
                 //case PersistentListenerMode.EventDefined:
                 //    return theEvent.GetDelegate(target, method);
@@ -130,22 +84,55 @@ namespace UnityMVVM
                     return new InvokableCall<string>(target, method);//UnityAction<string>(target, method, m_Arguments.stringArgument);
                 case PersistentListenerMode.Bool:
                     return new InvokableCall<bool>(target, method);//UnityAction<bool>(target, method, m_Arguments.boolArgument);
-                                                                   // case PersistentListenerMode.Void:
-                                                                   //     return method.MyInvokableCall<object> (typeof(UnityAction), target);//UnityAction(target, method);
+                                                                   //case PersistentListenerMode.Void:
+                                                                   //    return new InvokableCall(target, method);
             }
             return null;
         }
 
+    }
+    public class DataBindingCall
+    {
+        PersistentListenerMode[] modes;
+        private BaseInvokableCall _runtimeCall = null;
+        private bool _dirty = true;
+        private BaseExpression _expression = null;
+        private ParserArgument _parser = new ParserArgument();
+
+        public DataBindingCall(object target, MethodInfo method, PersistentListenerMode[] modes, string argument)
+        {
+            _runtimeCall = PersistentCall.GetRuntimeCall(target, method, modes);
+            _expression = _parser.Parser(argument);
+            this.modes = modes;
+        }
+
+        public bool AttachView(ViewData viewData/*, View view*/)
+        {
+            if (!_parser.dataExpressions.ContainsKey(viewData.name)) return false;
+            _parser.dataExpressions[viewData.name].data = viewData;
+            return true;
+        }
+
+        public void SetDirty()
+        {
+            //if (_dirty) return;
+            _dirty = true;
+        }
+
+        public void Update()
+        {
+            if (!_dirty) return;
+            _dirty = false;
+            if (_expression != null)
+                Invoke(_expression.GetValue());
+        }
+
         public void Invoke(object value)
         {
-            if (_runtimeCall == null)
-            {
-                _runtimeCall = GetRuntimeCall();
-            }
 
             if (_runtimeCall != null)
             {
-                switch (mode)
+                switch (modes[0])
                 {
                     case PersistentListenerMode.Object:
                         /*if (!(value is float))
@@ -156,7 +143,7 @@ namespace UnityMVVM
                     case PersistentListenerMode.Float:
                         if (!(value is float))
                         {
-                            value = Convert.ToDouble(value);
+                            value = Convert.ToSingle(value);
                         }
                         break;
                     case PersistentListenerMode.Int:
@@ -187,6 +174,28 @@ namespace UnityMVVM
     [Serializable]
     public class DataBinding
     {
-        [SerializeField] public List<PersistentCall> calls = new List<PersistentCall>();
+        [SerializeField] private List<PersistentCall> calls = new List<PersistentCall>();
+
+        public virtual void Rebuild(List<DataBindingCall> bindingCalls)
+        {
+            var count = calls.Count;
+            for (var i = 0; i < count; ++i)
+            {
+                var persistentCall = calls[i];
+                var methodInfo = PersistentCall.FindMethod(persistentCall.target, persistentCall.methodName, persistentCall.modes);
+                if (methodInfo == null) continue;
+                var bindingCall = new DataBindingCall(persistentCall.target, methodInfo, persistentCall.modes, persistentCall.argument);
+                bindingCalls.Add(bindingCall);
+            }
+        }
+        public void AddBinding(Object targetObj, string methodName, PersistentListenerMode[] modes, string argument)
+        {
+            var persistentCall = new PersistentCall();
+            persistentCall.target = targetObj;
+            persistentCall.methodName = methodName;
+            persistentCall.modes = modes;
+            persistentCall.argument = argument;
+            calls.Add(persistentCall);
+        }
     }
 }

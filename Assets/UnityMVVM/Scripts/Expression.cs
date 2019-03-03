@@ -6,84 +6,59 @@ using UnityEngine;
 
 namespace UnityMVVM
 {
-    enum Operator
-    {
-        Add,
-        Sub,
-        Mul,
-        Div,
-    }
-
-    enum Comparator
-    {
-        Equal,
-        NotEqual,
-        Greater,
-        GEqual,
-        Less,
-        LEqual,
-    }
-
     internal abstract class BaseExpression
     {
         public abstract object GetValue();
     }
 
-    internal class ComparatorExpression : BaseExpression
+    class InvertExpression : BaseExpression
     {
-        public Comparator comp;
+        public BaseExpression hs;
+        public override object GetValue() { return !Convert.ToBoolean(hs.GetValue()); }
+    }
+
+    class BinaryOperation : BaseExpression
+    {
         public BaseExpression lhs;
         public BaseExpression rhs;
+        public override object GetValue()
+        {
+            return null;
+        }
+    }
 
-        public ComparatorExpression(Comparator comp, BaseExpression lhs, BaseExpression rhs) { this.comp = comp; this.lhs = lhs; this.rhs = rhs; }
-
+    class OperationEqual : BinaryOperation
+    {
         public override object GetValue()
         {
             var l = lhs.GetValue();
             var r = rhs.GetValue();
-            switch (comp)
-            {
-                case Comparator.Equal: return l is string ? l as string == r.ToString() : l == r;
-                case Comparator.NotEqual: return l is string ? l as string != r.ToString() : l != r;
-                case Comparator.Greater: return Convert.ToDouble(l) > Convert.ToDouble(r);
-                case Comparator.GEqual: return Convert.ToDouble(l) >= Convert.ToDouble(r);
-                case Comparator.Less: return Convert.ToDouble(l) < Convert.ToDouble(r);
-                case Comparator.LEqual: return Convert.ToDouble(l) <= Convert.ToDouble(r);
-            }
-            return null;
+            if (l is string) return l as string == r.ToString();
+            else if (l is bool) return Convert.ToBoolean(l) == Convert.ToBoolean(r);
+            else if (l is int || l is float) return Convert.ToSingle(l) == Convert.ToSingle(r);
+            else return l == r;
         }
     }
-
-    internal class OperatorExpression : BaseExpression
+    class OperationNotEqual : OperationEqual { public override object GetValue() { return !(bool)base.GetValue(); } }
+    class OperationGreater : BinaryOperation { public override object GetValue() { return Convert.ToSingle(lhs.GetValue()) > Convert.ToSingle(rhs.GetValue()); } }
+    class OperationGEqual : BinaryOperation { public override object GetValue() { return Convert.ToSingle(lhs.GetValue()) >= Convert.ToSingle(rhs.GetValue()); } }
+    class OperationLess : BinaryOperation { public override object GetValue() { return Convert.ToSingle(lhs.GetValue()) < Convert.ToSingle(rhs.GetValue()); } }
+    class OperationLEqual : BinaryOperation { public override object GetValue() { return Convert.ToSingle(lhs.GetValue()) <= Convert.ToSingle(rhs.GetValue()); } }
+    class OperationLogicAnd : BinaryOperation { public override object GetValue() { return Convert.ToBoolean(lhs.GetValue()) && Convert.ToBoolean(rhs.GetValue()); } }
+    class OperationLogicOr : BinaryOperation { public override object GetValue() { return Convert.ToBoolean(lhs.GetValue()) || Convert.ToBoolean(rhs.GetValue()); } }
+    class OperationAdd : BinaryOperation
     {
-        public Operator op;
-        public BaseExpression lhs;
-        public BaseExpression rhs;
-
-        public OperatorExpression(Operator op, BaseExpression lhs, BaseExpression rhs) { this.op = op; this.lhs = lhs; this.rhs = rhs; }
-
         public override object GetValue()
         {
-            if (op == Operator.Add && lhs.GetValue() is string)
-            {
-                return (lhs.GetValue() as string) + rhs.GetValue().ToString();
-            }
-            else
-            {
-                var l = Convert.ToDouble(lhs.GetValue());
-                var r = Convert.ToDouble(rhs.GetValue());
-                switch (op)
-                {
-                    case Operator.Add: return l + r;
-                    case Operator.Sub: return l - r;
-                    case Operator.Mul: return l * r;
-                    case Operator.Div: return l / r;
-                }
-            }
-
-            return null;
+            var l = lhs.GetValue();
+            var r = rhs.GetValue();
+            if (l is string) return (l as string) + rhs.GetValue().ToString();
+            return Convert.ToSingle(l) + Convert.ToSingle(r);
         }
     }
+    class OperationSub : BinaryOperation { public override object GetValue() { return Convert.ToSingle(lhs.GetValue()) - Convert.ToSingle(rhs.GetValue()); } }
+    class OperationMul : BinaryOperation { public override object GetValue() { return Convert.ToSingle(lhs.GetValue()) * Convert.ToSingle(rhs.GetValue()); } }
+    class OperationDiv : BinaryOperation { public override object GetValue() { return Convert.ToSingle(lhs.GetValue()) / Convert.ToSingle(rhs.GetValue()); } }
 
     internal class TernaryOperatorExpression : BaseExpression
     {
@@ -98,7 +73,7 @@ namespace UnityMVVM
             var value = condition.GetValue();
             if (value == null) return rhs.GetValue();
             if (value is bool) return Convert.ToBoolean(value) ? lhs.GetValue() : rhs.GetValue();
-            if (value is int || value is float) return Convert.ToDouble(value) != 0 ? lhs.GetValue() : rhs.GetValue();
+            if (value is int || value is float) return Convert.ToSingle(value) != 0 ? lhs.GetValue() : rhs.GetValue();
             return value != null ? lhs.GetValue() : rhs.GetValue();
         }
     }
@@ -158,11 +133,25 @@ namespace UnityMVVM
         }
         private BaseExpression ParserExpression(string argument)
         {
-            // * /
-            var m = Regex.Match(argument, @"@(\d+)\s*([\*/])\s*@(\d+)");
+            // !
+            var m = Regex.Match(argument, @"!\s*@(\d+)");
             if (m.Success)
             {
-                expressions.Add(new OperatorExpression(m.Groups[2].Value == "*" ? Operator.Mul : Operator.Div, expressions[Convert.ToInt32(m.Groups[1].Value)], expressions[Convert.ToInt32(m.Groups[3].Value)]));
+                var inv = new InvertExpression();
+                inv.hs = expressions[Convert.ToInt32(m.Groups[1].Value)];
+                expressions.Add(inv);
+                return ParserExpression(argument.Replace(m.Groups[0].Value, "@" + (expressions.Count - 1)));
+            }
+
+            BinaryOperation binaryOp;
+            // * /
+            m = Regex.Match(argument, @"@(\d+)\s*([\*/])\s*@(\d+)");
+            if (m.Success)
+            {
+                if (m.Groups[2].Value == "*") binaryOp = new OperationMul(); else binaryOp = new OperationDiv();
+                binaryOp.lhs = expressions[Convert.ToInt32(m.Groups[1].Value)];
+                binaryOp.rhs = expressions[Convert.ToInt32(m.Groups[3].Value)];
+                expressions.Add(binaryOp);
                 return ParserExpression(argument.Replace(m.Groups[0].Value, "@" + (expressions.Count - 1)));
             }
 
@@ -170,7 +159,10 @@ namespace UnityMVVM
             m = Regex.Match(argument, @"@(\d+)\s*([\+-])\s*@(\d+)");
             if (m.Success)
             {
-                expressions.Add(new OperatorExpression(m.Groups[2].Value == "+" ? Operator.Add : Operator.Sub, expressions[Convert.ToInt32(m.Groups[1].Value)], expressions[Convert.ToInt32(m.Groups[3].Value)]));
+                if (m.Groups[2].Value == "+") binaryOp = new OperationAdd(); else binaryOp = new OperationSub();
+                binaryOp.lhs = expressions[Convert.ToInt32(m.Groups[1].Value)];
+                binaryOp.rhs = expressions[Convert.ToInt32(m.Groups[3].Value)];
+                expressions.Add(binaryOp);
                 return ParserExpression(argument.Replace(m.Groups[0].Value, "@" + (expressions.Count - 1)));
             }
 
@@ -178,22 +170,35 @@ namespace UnityMVVM
             m = Regex.Match(argument, @"@(\d+)\s*([><=!]=?)\s*@(\d+)");
             if (m.Success)
             {
-                Comparator comp;
                 switch (m.Groups[2].Value)
                 {
-                    case ">": comp = Comparator.Greater; break;
-                    case ">=": comp = Comparator.GEqual; break;
-                    case "<": comp = Comparator.Less; break;
-                    case "<=": comp = Comparator.LEqual; break;
-                    case "!=": comp = Comparator.NotEqual; break;
-                    default: comp = Comparator.Equal; break;
+                    case ">": binaryOp = new OperationGreater(); break;
+                    case ">=": binaryOp = new OperationGEqual(); break;
+                    case "<": binaryOp = new OperationLess(); break;
+                    case "<=": binaryOp = new OperationLEqual(); break;
+                    case "!=": binaryOp = new OperationNotEqual(); break;
+                    default: binaryOp = new OperationEqual(); break;
                 }
-                expressions.Add(new ComparatorExpression(comp, expressions[Convert.ToInt32(m.Groups[1].Value)], expressions[Convert.ToInt32(m.Groups[3].Value)]));
+                binaryOp.lhs = expressions[Convert.ToInt32(m.Groups[1].Value)];
+                binaryOp.rhs = expressions[Convert.ToInt32(m.Groups[3].Value)];
+                expressions.Add(binaryOp);
+                return ParserExpression(argument.Replace(m.Groups[0].Value, "@" + (expressions.Count - 1)));
+            }
+
+            // && ||
+            m = Regex.Match(argument, @"@(\d+)\s*(&{2}|\|{2})\s*@(\d+)");
+            if (m.Success)
+            {
+                if (m.Groups[2].Value=="&&")binaryOp = new OperationLogicAnd();
+                else binaryOp = new OperationLogicOr();
+                binaryOp.lhs = expressions[Convert.ToInt32(m.Groups[1].Value)];
+                binaryOp.rhs = expressions[Convert.ToInt32(m.Groups[3].Value)];
+                expressions.Add(binaryOp);
                 return ParserExpression(argument.Replace(m.Groups[0].Value, "@" + (expressions.Count - 1)));
             }
 
             // a?b:c
-            m = Regex.Match(argument, @"@(\d+)\s*?\s*@(\d+)\s*:\s*@(\d+)");
+            m = Regex.Match(argument, @"@(\d+)\s*\?\s*@(\d+)\s*:\s*@(\d+)");
             if (m.Success)
             {
                 expressions.Add(new TernaryOperatorExpression(expressions[Convert.ToInt32(m.Groups[1].Value)], expressions[Convert.ToInt32(m.Groups[2].Value)], expressions[Convert.ToInt32(m.Groups[3].Value)]));

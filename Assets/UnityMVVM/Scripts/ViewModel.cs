@@ -36,8 +36,11 @@ namespace UnityMVVM
         // 事件触发顺序 Compent.[OnDisable/OnDestroy] -> sceneUnloaded -> Compent.[Awake/Start/OnEnable] -> sceneLoaded
         private static void OnSceneUnloaded(Scene scene)
         {
-            _global.ClearViews();
-            AttachViewsInAllScenes();// 清除后未必执行，所以强制刷新一遍场景
+            if (_global)
+            {
+                _global.ClearViews();
+                AttachViewsInAllScenes();// 清除后未必执行，所以强制刷新一遍场景
+            }
         }
         private static void AttachViewsInScene(Scene scene)
         {
@@ -58,15 +61,24 @@ namespace UnityMVVM
             }
         }
 
-        public static void SetGlobal(string name, object value)
+        public static void SetGlobal(string name, object value, bool dirtyCheck = true)
         {
-            global.Set(name, value);
+            global.Set(name, value, dirtyCheck);
+        }
+        public static T GetGlobal<T>(string name)
+        {
+            return global.Get<T>(name);
         }
 
         public List<View> views = new List<View>();
         private Dictionary<string, ViewData> _data = new Dictionary<string, ViewData>();
+        private Dictionary<string, string> _localization;
+        public void SetLocalization(Dictionary<string, string> localization)
+        {
+            _localization = localization;
+        }
 
-        public void Set(string name, object value)
+        public ViewData GetViewData(string name)
         {
             ViewData viewData;
             if (!_data.ContainsKey(name))
@@ -78,10 +90,18 @@ namespace UnityMVVM
                     viewData.AttachView(views[i]);
                 }
             }
-            else if (_data[name] == value) return;
             else viewData = _data[name];
-            viewData.value = value;
-            viewData.SetDirty();
+            return viewData;
+        }
+
+        public void Set<T>(string name, T value, bool dirtyCheck = true)//<T>
+        {
+            GetViewData(name).SetValue(value, dirtyCheck);
+        }
+        public T Get<T>(string name)
+        {
+            if (!_data.ContainsKey(name)) return default(T);
+            return _data[name].GetValue<T>();
         }
 
         public void Update()
@@ -154,7 +174,7 @@ namespace UnityMVVM
                         argument = ("\"" + argument.Replace("{{", "\"+(").Replace("}}", ")+\"") + "\"").Replace("\"\"+", "").Replace("+\"\"", "");
                         //Debug.Log(argument);
                         view = t.gameObject.AddComponent<View>();
-                        view.AddDataBinding(text, "set_text", PersistentListenerMode.String, argument);
+                        view.AddDataBinding(text, "set_text", new PersistentListenerMode[] { PersistentListenerMode.String }, argument);
                         view.DetachViewModel();
                         view.AttachViewModel(this);
                     }
@@ -176,6 +196,10 @@ namespace UnityMVVM
         void OnDestroy()
         {
             DetachViewModel();
+            if (ViewModel._global == this)
+            {
+                ViewModel._global = null;
+            }
         }
 
         void OnBeforeTransformParentChanged()

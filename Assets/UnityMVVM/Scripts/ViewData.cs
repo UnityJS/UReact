@@ -1,4 +1,4 @@
-
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,51 +9,79 @@ namespace UnityMVVM
         public ViewData(string name) { this.name = name; }
         public string name;
         public object value;
-        private List<PersistentCall> _calls = new List<PersistentCall>();
+        private Dictionary<View, List<DataBindingCall>> _calls = new Dictionary<View, List<DataBindingCall>>();
+        public DataModelCall _dataModelCall = null;
         private bool _dirty = true;
 
         public void AttachView(View view)
         {
-            var viewCalls = view.dataBinding.calls;
-            var count = viewCalls.Count;
-            for (var i = 0; i < count; ++i)
+            if (_calls.ContainsKey(view))
             {
-                var call = viewCalls[i];
-                if (call.AttachView(this, view))
-                {
-                    if (_calls.IndexOf(call) != -1)
-                    {
-                        Debug.LogError("ViewData try to attach the same call");
-                    }
-                    _calls.Add(call);
-                    //Debug.Log("AttachView " + name + " View " + _calls.Count);
-                }
+                Debug.LogError("ViewData try to detach view that already exist!");
+                return;
             }
+            var calls = new List<DataBindingCall>();
+            _calls.Add(view, calls);
+            view.AttachViewData(this, calls);
         }
         public void DetachView(View view)
         {
-            for (var i = _calls.Count - 1; i >= 0; --i)
+            if (!_calls.ContainsKey(view))
             {
-                if (_calls[i].view == view)
-                {
-                    _calls.RemoveAt(i);
-                    //Debug.Log("DetachView " + name + " View " + _calls.Count);
-                }
+                Debug.LogError("ViewData try to detach view that don't exist!");
+                return;
             }
+            _calls.Remove(view);
         }
         public void Clear()
         {
             _calls.Clear();
         }
 
-        public void SetDirty()
+       public T GetValue<T>()
         {
+            var ret = value;
+            if(_dataModelCall!=null)
+                ret = _dataModelCall.GetValue();
+            if (value == null) return default(T);
+            //Debug.Log(name + " [" + _data[name].value.GetType().Name + "] [" + default(T).GetType().Name + "]");
+            return (T)value;
+        }
+
+        public void SetValue(object value, bool dirtyCheck = true)
+        {
+            if (dirtyCheck)
+            {
+                if (value is bool)
+                {
+                    if (Convert.ToBoolean(value) == Convert.ToBoolean(this.value)) return;
+                }
+                else if (value is int || value is float)
+                {
+                    if (Convert.ToSingle(value) == Convert.ToSingle(this.value)) return;
+                }
+                else if (value is string)
+                {
+                    if (Convert.ToString(value) == Convert.ToString(this.value)) return;
+                }
+                else
+                {
+                    if (value == this.value) return;
+                }
+            }
+
+            this.value = value;
+
             if (_dirty) return;
             _dirty = true;
-            var count = _calls.Count;
-            for (var i = 0; i < count; ++i)
+            foreach (var it in _calls)
             {
-                _calls[i].SetDirty();
+                var calls = it.Value;
+                var count = calls.Count;
+                for (var i = 0; i < count; ++i)
+                {
+                    calls[i].SetDirty();
+                }
             }
         }
 
@@ -61,10 +89,14 @@ namespace UnityMVVM
         {
             if (!_dirty) return;
             _dirty = false;
-            var count = _calls.Count;
-            for (var i = 0; i < count; ++i)
+            foreach (var it in _calls)
             {
-                _calls[i].Update();
+                var calls = it.Value;
+                var count = calls.Count;
+                for (var i = 0; i < count; ++i)
+                {
+                    calls[i].Update();
+                }
             }
         }
     }
