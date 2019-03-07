@@ -29,6 +29,7 @@ namespace UnityMVVM
 
         private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            //Debug.Log("OnSceneLoaded:" + scene.name);
             AttachViewsInScene(scene);
         }
 
@@ -176,6 +177,7 @@ namespace UnityMVVM
             DetachAllView();
             if (ViewModel._global == this)
             {
+                SceneManager.sceneLoaded -= OnSceneLoaded;
                 ViewModel._global = null;
             }
         }
