@@ -31,6 +31,7 @@ namespace UnityMVVM
 
         string _headerText;
         SerializedProperty _prop;
+        GameObject _targetGameObject;
         SerializedProperty _callsProp;
         ReorderableList _reorderableList;
         int _lastSelectedIndex;
@@ -73,6 +74,11 @@ namespace UnityMVVM
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             _prop = property;
+            var targetToUse = _prop.serializedObject.targetObject;
+            if (targetToUse is Component)
+                _targetGameObject = (targetToUse as Component).gameObject;
+            else _targetGameObject = targetToUse as GameObject;
+
             _headerText = label.text;
             State state = RestoreState(property);
             OnGUI(position);
@@ -189,31 +195,41 @@ namespace UnityMVVM
                     {
                         buttonLabel.Append(strNoBinding);
                     }
-                    else if (string.IsNullOrEmpty(propMethodName.stringValue))
-                    {
-                        buttonLabel.Append(targetObject.GetType().Name);
-                    }
                     else
                     {
-                        var modeCount = propModes.arraySize;
-                        var args = new StringBuilder();
-                        var types = new Type[modeCount];
-                        for (var i = 0; i < modeCount; ++i)
-                        {
-                            types[i] = Mode2Type((PersistentListenerMode)propModes.GetArrayElementAtIndex(i).enumValueIndex);
-                            args.Append(GetTypeName(types[i]));
-                            if (i < modeCount - 1)
-                                args.Append(", ");
-                        }
-                        var methodInfo = UnityEventBase.GetValidMethodInfo(targetObject, propMethodName.stringValue, types);
-                        if (methodInfo == null)
+                        if (_targetGameObject != (targetObject is Component ? (targetObject as Component).gameObject : targetObject))
                             buttonLabel.Append("<Missing>");
-                        if (propMethodName.stringValue.StartsWith("set_"))
-                            buttonLabel.Append(string.Format("{0}.{1} : {2}", targetObject.GetType().Name, propMethodName.stringValue.Substring(4), args.ToString()));
+                        buttonLabel.Append(targetObject.GetType().Name);
+
+                        if (!string.IsNullOrEmpty(propMethodName.stringValue))
+                        {
+                            var modeCount = propModes.arraySize;
+                            var args = new StringBuilder();
+                            var types = new Type[modeCount];
+                            for (var i = 0; i < modeCount; ++i)
+                            {
+                                types[i] = Mode2Type((PersistentListenerMode)propModes.GetArrayElementAtIndex(i).enumValueIndex);
+                                args.Append(GetTypeName(types[i]));
+                                if (i < modeCount - 1)
+                                    args.Append(", ");
+                            }
+                            buttonLabel.Append(".");
+                            MethodInfo methodInfo = null;
+                            if (_targetGameObject == targetObject is Component ? (targetObject as Component).gameObject : targetObject)
+                                methodInfo = UnityEventBase.GetValidMethodInfo(targetObject, propMethodName.stringValue, types);
+                            if (methodInfo == null)
+                                buttonLabel.Append("<Missing>");
+                            else if (string.IsNullOrEmpty(propArgument.stringValue))
+                                GUI.Label(argRect, GetMethodParameters(methodInfo), EditorStyles.centeredGreyMiniLabel);
+                            if (propMethodName.stringValue.StartsWith("set_"))
+                                buttonLabel.Append(string.Format("{0} : {1}", propMethodName.stringValue.Substring(4), args.ToString()));
+                            else
+                                buttonLabel.Append(string.Format("{0} ({1})", propMethodName.stringValue, args.ToString()));
+                        }
                     }
 
                     if (GUI.Button(functionRect, buttonLabel.ToString(), EditorStyles.popup))
-                        BuildPopupList(targetObject, propCall).DropDown(functionRect);
+                        BuildPopupList(_targetGameObject, propCall).DropDown(functionRect);
                 }
                 EditorGUI.EndProperty();
             }
@@ -281,7 +297,7 @@ namespace UnityMVVM
 
             var menu = new GenericMenu();
             menu.AddItem(new GUIContent(strNoBinding),
-                string.IsNullOrEmpty(propCall.FindPropertyRelative(methodNamePath).stringValue),
+                targetToUse == null,
                 ClearEventFunction,
                 new UnityEventFunction(propCall, null, null));
 
@@ -368,21 +384,17 @@ namespace UnityMVVM
             }
 
             menu.AddItem(new GUIContent(targetName + "/Self"),
-                 false,
+                 string.IsNullOrEmpty(propCall.FindPropertyRelative(methodNamePath).stringValue) && propCall.FindPropertyRelative(targetPath).objectReferenceValue == target,
                  SetTargetFunction,
                  new object[] { propCall, target });
 
+            menu.AddSeparator(targetName + "/");
+
             if (methods.Count > 0)
             {
-                IEnumerable<ValidMethodMap> orderedMethods = methods.OrderBy(e => e.methodInfo.Name.StartsWith("set_") ? 0 : 1).ThenBy(e => e.methodInfo.Name).ThenBy(e => e.methodInfo.GetParameters().Length);
-                Dictionary<string, int> methodsCount = new Dictionary<string, int>();
-                foreach (var validMethod in orderedMethods)
-                {
-                    if (methodsCount.ContainsKey(validMethod.methodInfo.Name)) methodsCount[validMethod.methodInfo.Name]++;
-                    else methodsCount.Add(validMethod.methodInfo.Name, 1);
-                }
-                foreach (var validMethod in orderedMethods)
-                    AddFunctionsForScript(menu, propCall, validMethod, targetName, methodsCount[validMethod.methodInfo.Name] > 1);
+                var orderedFields = methods.OrderBy(e => e.methodInfo.Name);
+                foreach (var validMethod in orderedFields)
+                    AddFunctionsForScript(menu, propCall, validMethod, targetName, false);
             }
         }
 

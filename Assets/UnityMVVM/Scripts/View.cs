@@ -33,21 +33,6 @@ namespace UnityMVVM
             _callsDirty = true;
         }
 
-        public void AttachViewData(ViewData viewData, List<DataBindingCall> dataCalls)
-        {
-            var count = bindingCalls.Count;
-            for (var i = 0; i < count; ++i)
-            {
-                var call = bindingCalls[i];
-                if (call.AttachView(viewData))
-                {
-                    dataCalls.Add(call);
-                    //Debug.Log("AttachView " + name + " View " + _calls.Count);
-                }
-            }
-            //this.dataModel.Attach(viewData, dataCalls);
-        }
-
         public void AttachViewModel(ViewModel viewModel)
         {
             if (viewModel == null) viewModel = ViewModel.global;
@@ -59,17 +44,18 @@ namespace UnityMVVM
                 bindingCalls.Clear();
                 modelCalls.Clear();
                 modelTarget.Clear();
-                dataBinding.Rebuild(bindingCalls);
-                dataModel.Rebuild(bindingCalls, modelCalls, modelTarget);
+                dataBinding.Rebuild(this.gameObject, bindingCalls);
+                dataModel.Rebuild(this.gameObject, bindingCalls, modelCalls, modelTarget);
                 _callsDirty = false;
             }
             viewModel.AttachView(this);
 
+            var count = bindingCalls.Count;
+            for (var i = 0; i < count; ++i)
+                bindingCalls[i].AttachViewModel(viewModel);
             foreach (var it in modelTarget)
-            {
                 viewModel.Set(it.Key, it.Value);
-            }
-            var count = modelCalls.Count;
+            count = modelCalls.Count;
             for (var i = 0; i < count; ++i)
             {
                 var call = modelCalls[i];
@@ -82,6 +68,11 @@ namespace UnityMVVM
         {
             if (this._viewModel == null) return;
             this._viewModel.DetachView(this);
+            var count = bindingCalls.Count;
+            for (var i = 0; i < count; ++i)
+                bindingCalls[i].DetachViewModel(viewModel);
+            foreach (var it in modelTarget)
+                this._viewModel.Set(it.Key, null);
             this._viewModel = null;
         }
 

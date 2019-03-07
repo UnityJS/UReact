@@ -31,6 +31,7 @@ namespace UnityMVVM
 
         string _headerText;
         SerializedProperty _prop;
+        GameObject _targetGameObject;
         SerializedProperty _callsProp;
         ReorderableList _reorderableList;
         int _lastSelectedIndex;
@@ -73,6 +74,11 @@ namespace UnityMVVM
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             _prop = property;
+            var targetToUse = _prop.serializedObject.targetObject;
+            if (targetToUse is Component)
+                _targetGameObject = (targetToUse as Component).gameObject;
+            else _targetGameObject = targetToUse as GameObject;
+
             _headerText = label.text;
             State state = RestoreState(property);
             OnGUI(position);
@@ -150,27 +156,6 @@ namespace UnityMVVM
             return args.ToString();
         }
 
-        /*static MethodInfo FindMethod(object target, string methodName, PersistentListenerMode mode)
-        {
-            switch (mode)
-            {
-                case PersistentListenerMode.Void:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new Type[0]);
-                case PersistentListenerMode.Float:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(float) });
-                case PersistentListenerMode.Int:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(int) });
-                case PersistentListenerMode.Bool:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(bool) });
-                case PersistentListenerMode.String:
-                    return UnityEventBase.GetValidMethodInfo(target, methodName, new[] { typeof(string) });
-                //case PersistentListenerMode.Object:
-                //    return  UnityEventBase.GetValidMethodInfo(target, methodName, new[] { argumentType ?? typeof(Object) });
-                default:
-                    return null;
-            }
-        }*/
-
         void DrawCall(Rect rect, int index, bool isactive, bool isfocused)
         {
             var propCall = _callsProp.GetArrayElementAtIndex(index);
@@ -189,6 +174,7 @@ namespace UnityMVVM
             var propArgument = propCall.FindPropertyRelative(argumentPath);
             var targetObject = propTarget.objectReferenceValue;
 
+
             Color c = GUI.backgroundColor;
             GUI.backgroundColor = Color.white;
 
@@ -202,37 +188,45 @@ namespace UnityMVVM
                 EditorGUI.BeginProperty(functionRect, GUIContent.none, propMethodName);
                 {
                     var buttonLabel = new StringBuilder();
-                    if (targetObject == null || string.IsNullOrEmpty(propMethodName.stringValue))
+                    if (targetObject == null)
                     {
                         buttonLabel.Append(strNoBinding);
                     }
                     else
                     {
-                        var modeCount = propModes.arraySize;
-                        var args = new StringBuilder();
-                        var types = new Type[modeCount];
-                        for (var i = 0; i < modeCount; ++i)
-                        {
-                            types[i] = Mode2Type((PersistentListenerMode)propModes.GetArrayElementAtIndex(i).enumValueIndex);
-                            args.Append(GetTypeName(types[i]));
-                            if (i < modeCount - 1)
-                                args.Append(", ");
-                        }
-                        var methodInfo = UnityEventBase.GetValidMethodInfo(targetObject, propMethodName.stringValue, types);
-                        if (methodInfo == null)
+                        if (_targetGameObject != (targetObject is Component ? (targetObject as Component).gameObject : targetObject))
                             buttonLabel.Append("<Missing>");
-                        else if (string.IsNullOrEmpty(propArgument.stringValue))
+                        buttonLabel.Append(targetObject.GetType().Name);
+
+                        if (!string.IsNullOrEmpty(propMethodName.stringValue))
                         {
-                            GUI.Label(argRect, GetMethodParameters(methodInfo), EditorStyles.centeredGreyMiniLabel);
+                            var modeCount = propModes.arraySize;
+                            var args = new StringBuilder();
+                            var types = new Type[modeCount];
+                            for (var i = 0; i < modeCount; ++i)
+                            {
+                                types[i] = Mode2Type((PersistentListenerMode)propModes.GetArrayElementAtIndex(i).enumValueIndex);
+                                args.Append(GetTypeName(types[i]));
+                                if (i < modeCount - 1)
+                                    args.Append(", ");
+                            }
+                            buttonLabel.Append(".");
+                            MethodInfo methodInfo = null;
+                            if (_targetGameObject == targetObject is Component ? (targetObject as Component).gameObject : targetObject)
+                                methodInfo = UnityEventBase.GetValidMethodInfo(targetObject, propMethodName.stringValue, types);
+                            if (methodInfo == null)
+                                buttonLabel.Append("<Missing>");
+                            else if (string.IsNullOrEmpty(propArgument.stringValue))
+                                GUI.Label(argRect, GetMethodParameters(methodInfo), EditorStyles.centeredGreyMiniLabel);
+                            if (propMethodName.stringValue.StartsWith("set_"))
+                                buttonLabel.Append(string.Format("{0} : {1}", propMethodName.stringValue.Substring(4), args.ToString()));
+                            else
+                                buttonLabel.Append(string.Format("{0} ({1})", propMethodName.stringValue, args.ToString()));
                         }
-                        if (propMethodName.stringValue.StartsWith("set_"))
-                            buttonLabel.Append(string.Format("{0}.{1} : {2}", targetObject.GetType().Name, propMethodName.stringValue.Substring(4), args.ToString()));
-                        else
-                            buttonLabel.Append(string.Format("{0}.{1} ({2})", targetObject.GetType().Name, propMethodName.stringValue, args.ToString()));
                     }
 
                     if (GUI.Button(functionRect, buttonLabel.ToString(), EditorStyles.popup))
-                        BuildPopupList(targetObject, propCall).DropDown(functionRect);
+                        BuildPopupList(_targetGameObject, propCall).DropDown(functionRect);
                 }
                 EditorGUI.EndProperty();
             }
@@ -291,38 +285,38 @@ namespace UnityMVVM
             public PersistentListenerMode[] modes;
         }
 
-        static GenericMenu BuildPopupList(Object target, SerializedProperty propCall)
+        static GenericMenu BuildPopupList(GameObject targetGameObject, SerializedProperty propCall)
         {
-            var targetToUse = target;
-            if (targetToUse is Component)
-                targetToUse = (target as Component).gameObject;
-
-
             var menu = new GenericMenu();
             menu.AddItem(new GUIContent(strNoBinding),
                 string.IsNullOrEmpty(propCall.FindPropertyRelative(methodNamePath).stringValue),
                 ClearEventFunction,
                 new UnityEventFunction(propCall, null, null));
 
-            if (targetToUse == null)
+            if (targetGameObject == null)
                 return menu;
+
+            var propTarget = propCall.FindPropertyRelative(targetPath).objectReferenceValue;
+            var propMethodName = propCall.FindPropertyRelative(methodNamePath).stringValue;
+
+            var activeMethod = targetGameObject.GetType().GetMethod("SetActive");
+            menu.AddItem(new GUIContent("Active"),
+               propTarget == targetGameObject && propMethodName == "SetActive",
+                SetEventFunction,
+                new UnityEventFunction(propCall, targetGameObject, activeMethod));
 
             menu.AddSeparator("");
 
-            GeneratePopUpForType(menu, targetToUse, false, propCall);
-            if (targetToUse is GameObject)
+            GeneratePopUpForType(menu, targetGameObject, false, propCall);
+            Component[] comps = targetGameObject.GetComponents<Component>();
+            var duplicateNames = comps.Where(c => c != null).Select(c => c.GetType().Name).GroupBy(x => x).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            foreach (Component comp in comps)
             {
-                Component[] comps = (targetToUse as GameObject).GetComponents<Component>();
-                var duplicateNames = comps.Where(c => c != null).Select(c => c.GetType().Name).GroupBy(x => x).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
-                foreach (Component comp in comps)
-                {
-                    if (comp == null)
-                        continue;
+                if (comp == null)
+                    continue;
 
-                    GeneratePopUpForType(menu, comp, duplicateNames.Contains(comp.GetType().Name), propCall);
-                }
+                GeneratePopUpForType(menu, comp, duplicateNames.Contains(comp.GetType().Name), propCall);
             }
-
             return menu;
         }
 
@@ -389,13 +383,18 @@ namespace UnityMVVM
 
             if (methods.Count > 0)
             {
-                IEnumerable<ValidMethodMap> orderedMethods = methods.OrderBy(e => e.methodInfo.Name.StartsWith("set_") ? 0 : 1).ThenBy(e => e.methodInfo.Name).ThenBy(e => e.methodInfo.GetParameters().Length);
+                var orderedFields = methods.FindAll(e => e.methodInfo.Name.StartsWith("set_")).OrderBy(e => e.methodInfo.Name);
+                var orderedMethods = methods.FindAll(e => !e.methodInfo.Name.StartsWith("set_")).OrderBy(e => e.methodInfo.Name).ThenBy(e => e.methodInfo.GetParameters().Length);
                 Dictionary<string, int> methodsCount = new Dictionary<string, int>();
                 foreach (var validMethod in orderedMethods)
                 {
                     if (methodsCount.ContainsKey(validMethod.methodInfo.Name)) methodsCount[validMethod.methodInfo.Name]++;
                     else methodsCount.Add(validMethod.methodInfo.Name, 1);
                 }
+                foreach (var validMethod in orderedFields)
+                    AddFunctionsForScript(menu, propCall, validMethod, targetName, false);
+
+                menu.AddSeparator(targetName + "/");
                 foreach (var validMethod in orderedMethods)
                     AddFunctionsForScript(menu, propCall, validMethod, targetName, methodsCount[validMethod.methodInfo.Name] > 1);
             }
@@ -456,11 +455,11 @@ namespace UnityMVVM
             else
             {
                 if (methodName.StartsWith("set_"))
-                    return string.Format("{0}/Fields/{1} : {2}", targetName, methodName.Substring(4), args);
+                    return string.Format("{0}/{1} : {2}", targetName, methodName.Substring(4), args);
                 else if (multiple)
-                    return string.Format("{0}/Methods/{1}.../{1} ({2})", targetName, methodName, args);
+                    return string.Format("{0}/{1}.../{1} ({2})", targetName, methodName, args);
                 else
-                    return string.Format("{0}/Methods/{1} ({2})", targetName, methodName, args);
+                    return string.Format("{0}/{1} ({2})", targetName, methodName, args);
             }
         }
 

@@ -97,11 +97,31 @@ namespace UnityMVVM
             return null;
         }
     }
+    internal class ArrayExpression : BaseExpression
+    {
+        private object[] values;
+        private BaseExpression[] list;
+        public ArrayExpression(BaseExpression[] list)
+        {
+            this.list = list;
+            values = new object[list.Length];
+        }
+        public int Length { get { return list.Length; } }
+        public override object GetValue()
+        {
+            var count = list.Length;
+            for (var i = 0; i < count; ++i)
+                values[i] = list[i].GetValue();
+            return values;
+        }
+    }
 
     internal class ParserArgument
     {
         private List<BaseExpression> expressions = new List<BaseExpression>();
         public Dictionary<string, DataExpression> dataExpressions = new Dictionary<string, DataExpression>();
+        public ArrayExpression rootExpression = null;
+
         private string ParserText(Match m)
         {
             expressions.Add(new ConstExpression(m.Groups[2].Value));
@@ -131,10 +151,24 @@ namespace UnityMVVM
             ParserExpression(m.Groups[1].Value);
             return "@" + (expressions.Count - 1);
         }
+        private ArrayExpression ParserArray(string argument)
+        {
+            var mc = Regex.Matches(argument, @"([^,]+)");
+            var list = new BaseExpression[mc.Count];
+            var i = 0;
+            foreach (Match m in mc)
+            {
+                list[i++] = ParserExpression(m.Value);
+            }
+            return new ArrayExpression(list);
+        }
+
         private BaseExpression ParserExpression(string argument)
         {
+            Match m;
+
             // !
-            var m = Regex.Match(argument, @"!\s*@(\d+)");
+            m = Regex.Match(argument, @"!\s*@(\d+)");
             if (m.Success)
             {
                 var inv = new InvertExpression();
@@ -189,7 +223,7 @@ namespace UnityMVVM
             m = Regex.Match(argument, @"@(\d+)\s*(&{2}|\|{2})\s*@(\d+)");
             if (m.Success)
             {
-                if (m.Groups[2].Value=="&&")binaryOp = new OperationLogicAnd();
+                if (m.Groups[2].Value == "&&") binaryOp = new OperationLogicAnd();
                 else binaryOp = new OperationLogicOr();
                 binaryOp.lhs = expressions[Convert.ToInt32(m.Groups[1].Value)];
                 binaryOp.rhs = expressions[Convert.ToInt32(m.Groups[3].Value)];
@@ -212,9 +246,9 @@ namespace UnityMVVM
             Debug.LogError("Error Expression!");
             return null;
         }
-        public BaseExpression Parser(string argument)
+        public void Parser(string argument)
         {
-            if (argument == null || argument.Length == 0) return null;
+            if (argument == null || argument.Length == 0) return;
             argument = Regex.Replace(argument, @"(['""])([^'""]*)\1", new MatchEvaluator(ParserText));
             argument = Regex.Replace(argument, @"[A-Za-z]\w+", new MatchEvaluator(ParserData));
             argument = Regex.Replace(argument, @"(^|[^\d])-(\d*\.?\d+)", new MatchEvaluator(ParserNegativeNumber));
@@ -224,7 +258,7 @@ namespace UnityMVVM
             {
                 argument = newArgument;
             }
-            return ParserExpression(argument);
+            rootExpression = ParserArray(argument);
         }
     }
 }

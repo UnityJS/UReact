@@ -9,39 +9,34 @@ namespace UnityMVVM
         public ViewData(string name) { this.name = name; }
         public string name;
         public object value;
-        private Dictionary<View, List<DataBindingCall>> _calls = new Dictionary<View, List<DataBindingCall>>();
+        private List<DataBindingCall> _calls = new List<DataBindingCall>();
         public DataModelCall _dataModelCall = null;
-        private bool _dirty = true;
+        private bool _dirty = false;
 
-        public void AttachView(View view)
+        public void AttachCall(DataBindingCall call)
         {
-            if (_calls.ContainsKey(view))
+            if (_calls.IndexOf(call) != -1)
             {
-                Debug.LogError("ViewData try to detach view that already exist!");
+                Debug.LogError("ViewData try to attach the same call!");
                 return;
             }
-            var calls = new List<DataBindingCall>();
-            _calls.Add(view, calls);
-            view.AttachViewData(this, calls);
+            if (value != null) _dirty = true;
+            _calls.Add(call);
         }
-        public void DetachView(View view)
+        public void DetachCall(DataBindingCall call)
         {
-            if (!_calls.ContainsKey(view))
+            if (_calls.IndexOf(call) == -1)
             {
-                Debug.LogError("ViewData try to detach view that don't exist!");
+                Debug.LogError("ViewData try to detach call that don't exist!");
                 return;
             }
-            _calls.Remove(view);
-        }
-        public void Clear()
-        {
-            _calls.Clear();
+            _calls.Remove(call);
         }
 
-       public T GetValue<T>()
+        public T GetValue<T>()
         {
             var ret = value;
-            if(_dataModelCall!=null)
+            if (_dataModelCall != null)
                 ret = _dataModelCall.GetValue();
             if (value == null) return default(T);
             //Debug.Log(name + " [" + _data[name].value.GetType().Name + "] [" + default(T).GetType().Name + "]");
@@ -52,36 +47,41 @@ namespace UnityMVVM
         {
             if (dirtyCheck)
             {
-                if (value is bool)
+                if (value == this.value) return;
+                if (value != null && this.value != null)
                 {
-                    if (Convert.ToBoolean(value) == Convert.ToBoolean(this.value)) return;
-                }
-                else if (value is int || value is float)
-                {
-                    if (Convert.ToSingle(value) == Convert.ToSingle(this.value)) return;
-                }
-                else if (value is string)
-                {
-                    if (Convert.ToString(value) == Convert.ToString(this.value)) return;
-                }
-                else
-                {
-                    if (value == this.value) return;
+                    if (value is bool)
+                    {
+                        if (Convert.ToBoolean(value) == Convert.ToBoolean(this.value)) return;
+                    }
+                    else if (value is int || value is float)
+                    {
+                        if (Convert.ToSingle(value) == Convert.ToSingle(this.value)) return;
+                    }
+                    else if (value is string)
+                    {
+                        if (Convert.ToString(value) == Convert.ToString(this.value)) return;
+                    }
+                    else
+                    {
+                        if (value == this.value) return;
+                    }
                 }
             }
 
+            //Debug.Log(name +" : "+ value.ToString());
             this.value = value;
+            SetDirty();
+        }
 
+        public void SetDirty()
+        {
             if (_dirty) return;
             _dirty = true;
-            foreach (var it in _calls)
+            var count = _calls.Count;
+            for (var i = 0; i < count; ++i)
             {
-                var calls = it.Value;
-                var count = calls.Count;
-                for (var i = 0; i < count; ++i)
-                {
-                    calls[i].SetDirty();
-                }
+                _calls[i].SetDirty();
             }
         }
 
@@ -89,14 +89,10 @@ namespace UnityMVVM
         {
             if (!_dirty) return;
             _dirty = false;
-            foreach (var it in _calls)
+            var count = _calls.Count;
+            for (var i = 0; i < count; ++i)
             {
-                var calls = it.Value;
-                var count = calls.Count;
-                for (var i = 0; i < count; ++i)
-                {
-                    calls[i].Update();
-                }
+                _calls[i].Update();
             }
         }
     }

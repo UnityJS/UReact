@@ -11,6 +11,13 @@ namespace UnityMVVM
     internal abstract class BaseInvokableGetter
     {
         public abstract object Invoke();
+        internal static BaseInvokableGetter GetRuntimeCall(object target, MethodInfo method)
+        {
+            var generic = typeof(InvokableGetter<>);
+            var specific = generic.MakeGenericType(new Type[] { method.ReturnType });
+            var ci = specific.GetConstructor(new[] { typeof(Object), typeof(MethodInfo) });
+            return ci.Invoke(new object[] { target, method }) as BaseInvokableGetter;
+        }
     }
 
     class InvokableGetter<T1> : BaseInvokableGetter
@@ -29,37 +36,14 @@ namespace UnityMVVM
 
     public class DataModelCall
     {
+        public string name;
         PersistentListenerMode mode;
         private BaseInvokableGetter _runtimeGetter = null;
-        public string name;
-
-        internal static BaseInvokableGetter GetRuntimeGetter(object target, MethodInfo method, PersistentListenerMode mode)
-        {
-            switch (mode)
-            {
-                //case PersistentListenerMode.EventDefined:
-                //    return theEvent.GetDelegate(target, method);
-                case PersistentListenerMode.Object:
-                    return new InvokableGetter<object>(target, method);
-                case PersistentListenerMode.Float:
-                    return new InvokableGetter<float>(target, method);
-                case PersistentListenerMode.Int:
-                    return new InvokableGetter<int>(target, method);//UnityAction<int>(target, method, m_Arguments.intArgument);
-                case PersistentListenerMode.String:
-                    return new InvokableGetter<string>(target, method);//UnityAction<string>(target, method, m_Arguments.stringArgument);
-                case PersistentListenerMode.Bool:
-                    return new InvokableGetter<bool>(target, method);//UnityAction<bool>(target, method, m_Arguments.boolArgument);
-                                                                     //case PersistentListenerMode.Void:
-                                                                     //    return new InvokableCall(target, method);
-            }
-            return null;
-        }
 
         public DataModelCall(object target, MethodInfo method, PersistentListenerMode mode, string argument)
         {
             name = argument;
-            if (method != null)
-                _runtimeGetter = GetRuntimeGetter(target, method, mode);
+            _runtimeGetter = BaseInvokableGetter.GetRuntimeCall(target, method);
             this.mode = mode;
         }
 
@@ -94,27 +78,33 @@ namespace UnityMVVM
             return null;
         }
 
-        public virtual void Rebuild(List<DataBindingCall> bindingCalls, List<DataModelCall> modelCalls, Dictionary<string, Object> modelTarget)
+        public virtual void Rebuild(GameObject gameObejct, List<DataBindingCall> bindingCalls, List<DataModelCall> modelCalls, Dictionary<string, Object> modelTarget)
         {
             var count = calls.Count;
             for (var i = 0; i < count; ++i)
             {
                 var persistentCall = calls[i];
-
+                var target = persistentCall.target;
+                if (gameObejct != (target is Component ? (target as Component).gameObject : target))
+                {
+                    Debug.LogError(string.Format("Target {0}.{1} is invalid!", target.name, persistentCall.methodName));
+                    continue;
+                }
                 if (string.IsNullOrEmpty(persistentCall.methodName))
                 {
-                    modelTarget.Add(persistentCall.argument, persistentCall.target);
+                    modelTarget.Add(persistentCall.argument, target);
                 }
                 else
                 {
                     if (persistentCall.modes.Length != 0) continue;
-                    var setterMethodInfo = PersistentCall.FindMethod(persistentCall.target, persistentCall.methodName, persistentCall.modes);
+                    var setterMethodInfo = PersistentCall.FindMethod(target, persistentCall.methodName, persistentCall.modes);
                     if (setterMethodInfo == null) continue;
-                    var getterMethodInfo = GetGetterMethodInfo(persistentCall.target, persistentCall.methodName);
+                    var getterMethodInfo = GetGetterMethodInfo(target, persistentCall.methodName);
                     if (getterMethodInfo == null) continue;
-                    var bindingCall = new DataBindingCall(persistentCall.target, setterMethodInfo, persistentCall.modes, persistentCall.argument);
+                    var bindingCall = new DataBindingCall(target, setterMethodInfo, persistentCall.argument);
+                    if (!bindingCall.isVaild()) continue;
                     bindingCalls.Add(bindingCall);
-                    var call = new DataModelCall(persistentCall.target, getterMethodInfo, persistentCall.modes[0], persistentCall.argument);
+                    var call = new DataModelCall(target, getterMethodInfo, persistentCall.modes[0], persistentCall.argument);
                     modelCalls.Add(call);
                 }
             }

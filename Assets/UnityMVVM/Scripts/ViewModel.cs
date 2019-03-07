@@ -18,9 +18,8 @@ namespace UnityMVVM
                 if (_global == null)
                 {
                     SceneManager.sceneLoaded += OnSceneLoaded;
-                    SceneManager.sceneUnloaded += OnSceneUnloaded;
+                    //SceneManager.sceneUnloaded += OnSceneUnloaded;
                     var GlobalViewModel = new GameObject("GlobalViewModel");
-                    DontDestroyOnLoad(GlobalViewModel);
                     _global = GlobalViewModel.AddComponent<ViewModel>();
                     AttachViewsInAllScenes();
                 }
@@ -34,14 +33,15 @@ namespace UnityMVVM
         }
 
         // 事件触发顺序 Compent.[OnDisable/OnDestroy] -> sceneUnloaded -> Compent.[Awake/Start/OnEnable] -> sceneLoaded
-        private static void OnSceneUnloaded(Scene scene)
+        /*private static void OnSceneUnloaded(Scene scene)
         {
             if (_global)
             {
-                _global.ClearViews();
-                AttachViewsInAllScenes();// 清除后未必执行，所以强制刷新一遍场景
+                //Debug.Log("OnSceneUnloaded:" + scene.name);
+                //_global.ClearViews();
+                //AttachViewsInAllScenes();// 清除后未必执行，所以强制刷新一遍场景
             }
-        }
+        }*/
         private static void AttachViewsInScene(Scene scene)
         {
             List<GameObject> rootGameObjects = new List<GameObject>();
@@ -63,6 +63,7 @@ namespace UnityMVVM
 
         public static void SetGlobal(string name, object value, bool dirtyCheck = true)
         {
+            //Debug.Log(name +" : "+ value.ToString());
             global.Set(name, value, dirtyCheck);
         }
         public static T GetGlobal<T>(string name)
@@ -80,21 +81,13 @@ namespace UnityMVVM
 
         public ViewData GetViewData(string name)
         {
-            ViewData viewData;
-            if (!_data.ContainsKey(name))
-            {
-                viewData = new ViewData(name);
-                _data[name] = viewData;
-                for (var i = 0; i < views.Count; ++i)
-                {
-                    viewData.AttachView(views[i]);
-                }
-            }
-            else viewData = _data[name];
+            if (_data.ContainsKey(name)) return _data[name];
+            var viewData = new ViewData(name);
+            _data[name] = viewData;
             return viewData;
         }
 
-        public void Set<T>(string name, T value, bool dirtyCheck = true)//<T>
+        public void Set(string name, object value, bool dirtyCheck = true)//<T>
         {
             GetViewData(name).SetValue(value, dirtyCheck);
         }
@@ -116,44 +109,29 @@ namespace UnityMVVM
         {
             if (views.IndexOf(view) != -1)
             {
-                Debug.LogError("Try to AttachView the same view");
+                Debug.LogError("ViewModel try to attach the same view!");
                 return;
             }
             views.Add(view);
-            foreach (var it in _data)
-            {
-                var viewData = it.Value;
-                viewData.AttachView(view);
-            }
         }
 
         public void DetachView(View view)
         {
-            views.Remove(view);
-            foreach (var it in _data)
+            if (views.IndexOf(view) == -1)
             {
-                var viewData = it.Value;
-                viewData.DetachView(view);
+                Debug.LogError("ViewModel try to attach view that don't exist!!");
+                return;
             }
+            views.Remove(view);
         }
 
-        public void DetachViewModel()
+        public void DetachAllView()
         {
+            //Debug.Log("DetachAllView");
             for (var i = views.Count - 1; i >= 0; --i)
-            {
                 views[i].DetachViewModel();
-            }
             if (views.Count > 0)
                 Debug.LogError("Views are not all cleared! " + views.Count + " left");
-        }
-
-        public void ClearViews()
-        {
-            views.Clear();
-            foreach (var it in _data)
-            {
-                it.Value.Clear();
-            }
         }
 
         void FindAndAttachViews(Transform t)
@@ -195,7 +173,7 @@ namespace UnityMVVM
 
         void OnDestroy()
         {
-            DetachViewModel();
+            DetachAllView();
             if (ViewModel._global == this)
             {
                 ViewModel._global = null;
@@ -204,7 +182,7 @@ namespace UnityMVVM
 
         void OnBeforeTransformParentChanged()
         {
-            DetachViewModel();
+            DetachAllView();
         }
 
         void OnTransformParentChanged()
