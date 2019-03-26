@@ -48,7 +48,7 @@ namespace UnityMVVM
 
         public InvokableCall(object target, MethodInfo theFunction) : base(target, theFunction)
         {
-            Delegate += (UnityAction<T1>)theFunction.CreateDelegate(typeof(UnityAction<T1>), target);
+            Delegate += (UnityAction<T1>)System.Delegate.CreateDelegate(typeof(UnityAction<T1>), target, theFunction);
         }
 
         public override void Invoke(object[] args)
@@ -69,7 +69,7 @@ namespace UnityMVVM
         public InvokableCall(object target, MethodInfo theFunction)
             : base(target, theFunction)
         {
-            Delegate = (UnityAction<T1, T2>)theFunction.CreateDelegate(typeof(UnityAction<T1, T2>), target);
+            Delegate = (UnityAction<T1, T2>)System.Delegate.CreateDelegate(typeof(UnityAction<T1, T2>), target, theFunction);
         }
 
         public override void Invoke(object[] args)
@@ -91,7 +91,7 @@ namespace UnityMVVM
         public InvokableCall(object target, MethodInfo theFunction)
             : base(target, theFunction)
         {
-            Delegate = (UnityAction<T1, T2, T3>)theFunction.CreateDelegate(typeof(UnityAction<T1, T2, T3>), target);
+            Delegate = (UnityAction<T1, T2, T3>)System.Delegate.CreateDelegate(typeof(UnityAction<T1, T2, T3>), target, theFunction);
         }
 
         public override void Invoke(object[] args)
@@ -114,7 +114,8 @@ namespace UnityMVVM
         public InvokableCall(object target, MethodInfo theFunction)
             : base(target, theFunction)
         {
-            Delegate = (UnityAction<T1, T2, T3, T4>)theFunction.CreateDelegate(typeof(UnityAction<T1, T2, T3, T4>), target);
+            Delegate = (UnityAction<T1, T2, T3, T4>)System.Delegate.CreateDelegate(typeof(UnityAction<T1, T2, T3, T4>), target, theFunction);
+            //Delegate = (UnityAction<T1, T2, T3, T4>)theFunction.CreateDelegate(typeof(UnityAction<T1, T2, T3, T4>), target);
         }
 
         public override void Invoke(object[] args)
@@ -132,7 +133,7 @@ namespace UnityMVVM
     }
 
     [Serializable]
-    class PersistentCall
+    class ExpressionCall
     {
         [SerializeField] public Object target;
         [SerializeField] public string methodName;
@@ -235,7 +236,7 @@ namespace UnityMVVM
             foreach (var it in _parser.dataExpressions)
             {
                 it.Value.data.DetachCall(this);
-                it.Value.data=null;
+                it.Value.data = null;
             }
             _dirty = true;
             return true;
@@ -306,7 +307,7 @@ namespace UnityMVVM
     [Serializable]
     public class DataBinding
     {
-        [SerializeField] private List<PersistentCall> calls = new List<PersistentCall>();
+        [SerializeField] private List<ExpressionCall> calls = new List<ExpressionCall>();
 
         public virtual void Rebuild(GameObject gameObejct, List<DataBindingCall> bindingCalls)
         {
@@ -320,16 +321,19 @@ namespace UnityMVVM
                     Debug.LogError(string.Format("Target {0}.{1} is invalid!", target.name, persistentCall.methodName));
                     continue;
                 }
-                var methodInfo = PersistentCall.FindMethod(target, persistentCall.methodName, persistentCall.modes);
+                var methodInfo = ExpressionCall.FindMethod(target, persistentCall.methodName, persistentCall.modes);
                 if (methodInfo == null) continue;
                 var bindingCall = new DataBindingCall(target, methodInfo, persistentCall.argument);
                 if (!bindingCall.isVaild()) continue;
                 bindingCalls.Add(bindingCall);
             }
         }
+
+        public int GetBindingCount() { return calls.Count; }
+        public void ClearBinding() { calls.Clear(); }
         public void AddBinding(Object targetObj, string methodName, PersistentListenerMode[] modes, string argument)
         {
-            var persistentCall = new PersistentCall();
+            var persistentCall = new ExpressionCall();
             persistentCall.target = targetObj;
             persistentCall.methodName = methodName;
             persistentCall.modes = modes;

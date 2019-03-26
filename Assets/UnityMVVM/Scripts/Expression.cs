@@ -52,7 +52,7 @@ namespace UnityMVVM
         {
             var l = lhs.GetValue();
             var r = rhs.GetValue();
-            if (l is string) return (l as string) + rhs.GetValue().ToString();
+            if (l is string || r is string) return Convert.ToString(l) + Convert.ToString(r);
             return Convert.ToSingle(l) + Convert.ToSingle(r);
         }
     }
@@ -148,8 +148,8 @@ namespace UnityMVVM
         }
         private string ParserBrackets(Match m)
         {
-            ParserExpression(m.Groups[1].Value);
-            return "@" + (expressions.Count - 1);
+            var ret = ParserExpression(m.Groups[1].Value);
+            return "@" + expressions.IndexOf(ret);
         }
         private ArrayExpression ParserArray(string argument)
         {

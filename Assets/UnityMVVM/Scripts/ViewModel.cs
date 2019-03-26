@@ -71,6 +71,11 @@ namespace UnityMVVM
         {
             return global.Get<T>(name);
         }
+        
+        public static ViewData GetGlobalData(string name)
+        {
+            return global.GetViewData(name);
+        }
 
         public List<View> views = new List<View>();
         private Dictionary<string, ViewData> _data = new Dictionary<string, ViewData>();
@@ -145,18 +150,9 @@ namespace UnityMVVM
             else
             {
                 var text = t.GetComponent<Text>();
-                if (text)
+                if (text && text.text.IndexOf("{{") != -1)
                 {
-                    var argument = text.text;
-                    if (argument.IndexOf("{{") != -1)
-                    {
-                        argument = ("\"" + argument.Replace("{{", "\"+(").Replace("}}", ")+\"") + "\"").Replace("\"\"+", "").Replace("+\"\"", "");
-                        //Debug.Log(argument);
-                        view = t.gameObject.AddComponent<View>();
-                        view.AddDataBinding(text, "set_text", new PersistentListenerMode[] { PersistentListenerMode.String }, argument);
-                        view.DetachViewModel();
-                        view.AttachViewModel(this);
-                    }
+                    t.gameObject.AddComponent<View>().SetTextDataBinding(text.text);
                 }
             }
             var childCount = t.childCount;

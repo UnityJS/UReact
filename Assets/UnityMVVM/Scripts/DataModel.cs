@@ -56,7 +56,7 @@ namespace UnityMVVM
     [Serializable]
     public class DataModel
     {
-        [SerializeField] private List<PersistentCall> calls = new List<PersistentCall>();
+        [SerializeField] private List<ExpressionCall> calls = new List<ExpressionCall>();
 
         public static MethodInfo GetGetterMethodInfo(object obj, string functionName)
         {
@@ -97,7 +97,7 @@ namespace UnityMVVM
                 else
                 {
                     if (persistentCall.modes.Length != 0) continue;
-                    var setterMethodInfo = PersistentCall.FindMethod(target, persistentCall.methodName, persistentCall.modes);
+                    var setterMethodInfo = ExpressionCall.FindMethod(target, persistentCall.methodName, persistentCall.modes);
                     if (setterMethodInfo == null) continue;
                     var getterMethodInfo = GetGetterMethodInfo(target, persistentCall.methodName);
                     if (getterMethodInfo == null) continue;

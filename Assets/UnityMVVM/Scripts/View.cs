@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 namespace UnityMVVM
@@ -31,6 +32,18 @@ namespace UnityMVVM
             bindingCalls.Add(bindingCall);*/
             dataBinding.AddBinding(target, methodName, modes, argument);
             _callsDirty = true;
+        }
+        
+        public void SetTextDataBinding(string argument)
+        {
+            var text = GetComponent<Text>();
+            if (text == null) return;
+            argument = ("\"" + argument.Replace("{{", "\"+(").Replace("}}", ")+\"") + "\"").Replace("\"\"+", "").Replace("+\"\"", "");
+            //Debug.Log(argument);
+            this.DetachViewModel();
+            this.dataBinding.ClearBinding();
+            this.AddDataBinding(text, "set_text", new PersistentListenerMode[] { PersistentListenerMode.String }, argument);
+            AttachViewModel(this.transform.GetComponentInParent<ViewModel>());
         }
 
         public void AttachViewModel(ViewModel viewModel)

@@ -12,6 +12,16 @@ namespace UnityMVVM
         private List<DataBindingCall> _calls = new List<DataBindingCall>();
         public DataModelCall _dataModelCall = null;
         private bool _dirty = false;
+        private bool _keepStorage = false;
+
+        public void KeepStorage(object defaultValue)
+        {
+            _keepStorage = true;
+            var strValue = PlayerPrefs.GetString(name);
+            if (String.IsNullOrEmpty(strValue))
+                SetValue(defaultValue);
+            else SetValue(Convert.ChangeType(strValue, defaultValue.GetType()));
+        }
 
         public void AttachCall(DataBindingCall call)
         {
@@ -40,7 +50,7 @@ namespace UnityMVVM
                 ret = _dataModelCall.GetValue();
             if (value == null) return default(T);
             //Debug.Log(name + " [" + _data[name].value.GetType().Name + "] [" + default(T).GetType().Name + "]");
-            return (T)value;
+            return (T)value;//Convert.ChangeType(value, typeof(T));
         }
 
         public void SetValue(object value, bool dirtyCheck = true)
@@ -71,6 +81,12 @@ namespace UnityMVVM
 
             //Debug.Log(name +" : "+ value.ToString());
             this.value = value;
+            if (_keepStorage)
+            {
+                PlayerPrefs.SetString(name, value.ToString());
+                //Debug.Log(string.Format("KeepStorage {0} = {1}:{2}", name, value, value.GetType()));
+            }
+
             SetDirty();
         }
 
