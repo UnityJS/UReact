@@ -1,6 +1,6 @@
 # UnityMVVM
 
-A swift MVVM framework for Unity3D.
+A swift ugui framework for Unity3D.
 
 ## How to use
 
@@ -8,22 +8,20 @@ A swift MVVM framework for Unity3D.
 
 - Modify the `UI.Text` component properties `text` to `"My Level is {{level+1}}"`
 
-- Or add the `UnityMVVM.View` component
+- Or add the `UReact.View` component
   - Bind the data you need under the current GameObject
   - Input value `'"My Level is "+(level+1)'`
 
 **step 2**
 * Coding in the script
   ```C#
-  using UnityMVVM;
+  using UReact;
   ViewModel.SetGlobal("level", 11);
   ```
 
-* Or add the `UnityMVVM.ViewModel` component to control children's `UnityMVVM.View`
+* Or add the `UReact.ViewModel` component to control children's `UReact.View`
   ```C#
   myViewModel.Set("level", 11);
   ```
   
 ## Contact
-    Email: 351119125@qq.com
-    WeChat: panhuihui1986
