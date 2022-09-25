@@ -1,4 +1,4 @@
-# UnityMVVM
+# UReact
 
 A swift ugui framework for Unity3D.
 
